@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+  printf 'install: %s\n' "$1" >&2
+  exit 1
+}
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source_path="$(readlink -f "$script_dir/music")"
+install_bin_dir="${INSTALL_BIN_DIR:-$HOME/.local/bin}"
+target_path="$install_bin_dir/music"
+force=0
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--force]
+
+Install playlist-fs for daily use by symlinking:
+  $target_path -> $source_path
+
+Environment:
+  INSTALL_BIN_DIR   Override the install directory (default: $HOME/.local/bin)
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --force)
+      force=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+  shift
+done
+
+[ -x "$source_path" ] || die "missing executable: $source_path"
+
+mkdir -p "$install_bin_dir"
+
+if [ -e "$target_path" ] || [ -L "$target_path" ]; then
+  if [ -L "$target_path" ] && [ "$(readlink -f "$target_path")" = "$source_path" ]; then
+    printf 'install: already installed at %s\n' "$target_path"
+  elif [ -L "$target_path" ] && [ "$force" -eq 1 ]; then
+    ln -sfn "$source_path" "$target_path"
+    printf 'install: updated %s -> %s\n' "$target_path" "$source_path"
+  else
+    die "existing path at $target_path; move it aside or rerun with --force if it is a symlink you want to replace"
+  fi
+else
+  ln -s "$source_path" "$target_path"
+  printf 'install: linked %s -> %s\n' "$target_path" "$source_path"
+fi
+
+if ! command -v mpg123 >/dev/null 2>&1; then
+  printf 'install: mpg123 not found. On Linux Mint run:\n' >&2
+  printf '  sudo apt install -y mpg123\n' >&2
+fi
+
+case ":${PATH:-}:" in
+  *":$install_bin_dir:"*)
+    printf 'install: %s is already in PATH\n' "$install_bin_dir"
+    ;;
+  *)
+    printf 'install: add %s to PATH with:\n' "$install_bin_dir"
+    printf "  echo 'export PATH=\"%s:\$PATH\"' >> \"\$HOME/.bashrc\"\n" "$install_bin_dir"
+    printf '  source "$HOME/.bashrc"\n'
+    ;;
+esac
+
+printf 'install: run music "$HOME/Music/Playlists/<name>" or music "$HOME/Music/_library"\n'

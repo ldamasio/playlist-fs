@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+  printf 'uninstall: %s\n' "$1" >&2
+  exit 1
+}
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source_path="$(readlink -f "$script_dir/music")"
+install_bin_dir="${INSTALL_BIN_DIR:-$HOME/.local/bin}"
+target_path="$install_bin_dir/music"
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0")
+
+Remove the playlist-fs symlink installed for daily use:
+  $target_path
+
+Environment:
+  INSTALL_BIN_DIR   Override the install directory (default: $HOME/.local/bin)
+EOF
+}
+
+case "${1:-}" in
+  "")
+    ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    die "unknown argument: $1"
+    ;;
+esac
+
+if [ ! -e "$target_path" ] && [ ! -L "$target_path" ]; then
+  printf 'uninstall: nothing to remove at %s\n' "$target_path"
+  exit 0
+fi
+
+[ -L "$target_path" ] || die "refusing to remove non-symlink: $target_path"
+[ "$(readlink -f "$target_path")" = "$source_path" ] || die "refusing to remove symlink not installed from this repo: $target_path"
+
+rm "$target_path"
+printf 'uninstall: removed %s\n' "$target_path"

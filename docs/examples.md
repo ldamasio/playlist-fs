@@ -1,5 +1,17 @@
 # Examples
 
+## Install for daily use
+
+```bash
+./bin/install
+```
+
+## Remove the daily-use install
+
+```bash
+./bin/uninstall
+```
+
 ## Create the base layout
 
 ```bash

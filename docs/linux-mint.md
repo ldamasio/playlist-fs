@@ -19,11 +19,12 @@ sudo apt install -y git mpg123
 cd "$HOME"
 git clone https://github.com/ldamasio/playlist-fs.git
 cd playlist-fs
-mkdir -p "$HOME/.local/bin"
-ln -sf "$PWD/bin/music" "$HOME/.local/bin/music"
+./bin/install
 ```
 
-If `music` is not found after that, add `~/.local/bin` to your shell `PATH`:
+If `music` is not found after that, run the exact command printed by `./bin/install`.
+
+The usual command is:
 
 ```bash
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
@@ -42,7 +43,23 @@ If that still says the command was not found, close Terminal, open it again, and
 command -v music
 ```
 
-## 3. Create the filesystem layout
+To remove the daily-use install later:
+
+```bash
+./bin/uninstall
+```
+
+## 3. Quick test without installing into PATH
+
+If you want to test playback from the repo itself, without relying on `PATH`, use:
+
+```bash
+./bin/music "$HOME/Music/_library"
+```
+
+That works once you already have `.mp3` files inside `"$HOME/Music/_library"`.
+
+## 4. Create the filesystem layout
 
 ```bash
 mkdir -p "$HOME/Music/_library"
@@ -54,7 +71,7 @@ The rules are simple:
 - `_library/` is where the real files live
 - `Playlists/<name>/` contains only symlinks to files in `_library`
 
-## 4. Put music into `_library`
+## 5. Put music into `_library`
 
 Create artist and album folders:
 
@@ -77,7 +94,7 @@ You can inspect what is there with:
 find "$HOME/Music/_library" -type f
 ```
 
-## 5. Create a playlist by symlinking tracks
+## 6. Create a playlist by symlinking tracks
 
 Link a real file from `_library` into `Playlists/focus`:
 
@@ -96,7 +113,7 @@ readlink -f "$HOME/Music/Playlists/focus/artist-album-track.mp3"
 
 The file inside the playlist should be a symlink pointing back to `_library`.
 
-## 6. Start playback
+## 7. Start playback
 
 Play the default playlist:
 
@@ -129,7 +146,7 @@ What the command does:
 - only sends `.mp3` files to `mpg123`
 - starts playback in the background
 
-## 7. Stop playback
+## 8. Stop playback
 
 ```bash
 pkill -x mpg123
@@ -137,7 +154,7 @@ pkill -x mpg123
 
 There is no internal playback state. Stopping playback means stopping the `mpg123` process.
 
-## 8. Common mistakes
+## 9. Common mistakes
 
 `music: mpg123 not found in PATH`
 
@@ -155,7 +172,7 @@ sudo apt install -y mpg123
 - pass either `"$HOME/Music/_library"` or `"$HOME/Music/Playlists/<name>"`
 - do not pass `"$HOME/Music"` or `"$HOME/Music/Playlists"` by itself
 
-## 9. Daily use
+## 10. Daily use
 
 Add more real files under `_library`, then symlink the ones you want into playlists:
 

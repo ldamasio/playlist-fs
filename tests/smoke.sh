@@ -1,28 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(mktemp -d)"
-cleanup() { rm -rf "$ROOT"; }
-trap cleanup EXIT
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-export MUSIC_DIR="$ROOT/Music"
+bash "$SCRIPT_DIR/playback.sh"
+bash "$SCRIPT_DIR/install.sh"
 
-# Run init
-bash "$(dirname "$0")/../bin/music-init.sh" "$MUSIC_DIR"
-
-# Create a fake track in canonical library
-mkdir -p "$MUSIC_DIR/_library/Artist/Album"
-TRACK="$MUSIC_DIR/_library/Artist/Album/01 - Track.mp3"
-printf "fake" > "$TRACK"
-
-# Link into a playlist
-bash "$(dirname "$0")/../bin/music-link" "Artist/Album/01 - Track.mp3" focus --name "artist-track.mp3"
-
-DEST="$MUSIC_DIR/Playlists/focus/artist-track.mp3"
-
-# Assertions
-test -L "$DEST"
-test -e "$DEST"
-test "$(readlink -f "$DEST")" = "$TRACK"
-
-echo "✅ smoke test passed"
+echo "smoke test passed"

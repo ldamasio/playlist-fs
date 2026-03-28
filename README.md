@@ -19,9 +19,9 @@ Just files + symlinks + shell.
 
 ---
 
-## Install
+## Daily Use Setup
 
-This repo currently ships one playback command: `music`.
+Install the `music` command into `~/.local/bin` for normal day-to-day use.
 
 On Linux Mint:
 
@@ -30,18 +30,27 @@ sudo apt update
 sudo apt install -y git mpg123
 git clone https://github.com/ldamasio/playlist-fs.git
 cd playlist-fs
-mkdir -p ~/.local/bin
-ln -sf "$PWD/bin/music"         ~/.local/bin/music
+./bin/install
 ```
 
-If `~/.local/bin` is not already in your `PATH`:
+If `~/.local/bin` is not already in your `PATH`, `./bin/install` prints the exact command to add it.
+
+To remove the daily-use install later:
 
 ```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+./bin/uninstall
 ```
 
-For a full beginner walkthrough, see [docs/linux-mint.md](/home/psyctl/apps/playlist-fs/docs/linux-mint.md).
+For the full beginner flow on Linux Mint, see [docs/linux-mint.md](/home/psyctl/apps/playlist-fs/docs/linux-mint.md).
+
+## Quick Test
+
+If you just want to test the repo before installing anything into your shell, run the script directly:
+
+```bash
+./bin/music "$HOME/Music/_library"
+./bin/music "$HOME/Music/Playlists/focus"
+```
 
 ## Quick Start
 
@@ -89,3 +98,9 @@ pkill -x mpg123
 - Linux Mint quickstart: [docs/linux-mint.md](/home/psyctl/apps/playlist-fs/docs/linux-mint.md)
 - Examples: [docs/examples.md](/home/psyctl/apps/playlist-fs/docs/examples.md)
 - Design: [docs/design.md](/home/psyctl/apps/playlist-fs/docs/design.md)
+
+## Tests
+
+```bash
+bash tests/smoke.sh
+```
