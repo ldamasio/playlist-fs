@@ -4,7 +4,7 @@
 
 ```bash
 music-init.sh
-````
+```
 
 ## Custom base directory
 
@@ -44,4 +44,30 @@ readlink -f "$HOME/Music/Playlists/focus/tycho-awake.mp3"
 
 ```bash
 find "$HOME/Music/Playlists" -type l ! -exec test -e {} \; -print
+```
+
+## Playback
+
+Default playlist:
+
+```bash
+music
+```
+
+Specific playlist:
+
+```bash
+music "$HOME/Music/Playlists/focus"
+```
+
+Entire library:
+
+```bash
+music "$HOME/Music/_library"
+```
+
+Stop playback:
+
+```bash
+pkill -x mpg123
 ```

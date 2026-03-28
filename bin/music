@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+  printf 'music: %s\n' "$1" >&2
+  exit 1
+}
+
+MUSIC_DIR="${MUSIC_DIR:-$HOME/Music}"
+DEFAULT_PATH="${MUSIC_PLAY_DEFAULT:-$MUSIC_DIR/Playlists/focus}"
+
+target="${1:-$DEFAULT_PATH}"
+library_root="$MUSIC_DIR/_library"
+playlists_root="$MUSIC_DIR/Playlists"
+
+command -v mpg123 >/dev/null 2>&1 || die "mpg123 not found in PATH"
+[ -e "$target" ] || die "path not found: $target"
+
+target_abs="$(readlink -f "$target")"
+library_abs="$(readlink -f "$library_root" 2>/dev/null || printf '%s\n' "$library_root")"
+playlists_abs="$(readlink -f "$playlists_root" 2>/dev/null || printf '%s\n' "$playlists_root")"
+
+case "$target_abs" in
+  "$library_abs"|"$library_abs"/*)
+    ;;
+  "$playlists_abs")
+    die "pass a specific playlist path, not $playlists_root"
+    ;;
+  "$playlists_abs"/*)
+    ;;
+  *)
+    die "path must be $library_root or $playlists_root/<name>"
+    ;;
+esac
+
+files=()
+while IFS= read -r -d '' file; do
+  files+=("$file")
+done < <(find -L "$target" -type f -iname '*.mp3' -print0 2>/dev/null || true)
+
+[ "${#files[@]}" -gt 0 ] || die "no supported audio files under: $target"
+
+nohup mpg123 -q -Z -- "${files[@]}" >/dev/null 2>&1 </dev/null &

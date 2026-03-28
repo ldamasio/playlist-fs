@@ -29,3 +29,23 @@ Option A (recommended): symlink scripts into `~/.local/bin`:
 mkdir -p ~/.local/bin
 ln -sf "$PWD/bin/music-init.sh" ~/.local/bin/music-init.sh
 ln -sf "$PWD/bin/music-link"    ~/.local/bin/music-link
+ln -sf "$PWD/bin/music"         ~/.local/bin/music
+```
+
+## Playback
+
+`music` is a stateless wrapper around `mpg123`.
+
+- It reads the filesystem at launch time.
+- It follows playlist symlinks with `find -L`.
+- It only passes `.mp3` files to `mpg123`.
+- It backgrounds playback and leaves process control to the shell.
+
+Examples:
+
+```bash
+music
+music "$HOME/Music/Playlists/focus"
+music "$HOME/Music/_library"
+pkill -x mpg123
+```

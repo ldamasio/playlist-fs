@@ -38,7 +38,7 @@ Canonical path layout:
 
 ```text
 ~/Music/_library/Artist/Album/Track.ext
-````
+```
 
 Playlist link destination:
 
@@ -47,6 +47,19 @@ Playlist link destination:
 ```
 
 You can override the destination filename with `--name`.
+
+---
+
+## Playback
+
+Playback stays stateless:
+
+- `playlist-fs` owns the filesystem graph
+- `music` resolves one path at a time with `find -L`
+- `mpg123` is started as a normal background process
+- stopping playback is just killing the `mpg123` process
+
+This avoids duplicating `_library` and `Playlists` in a second index or daemon.
 
 ---
 
