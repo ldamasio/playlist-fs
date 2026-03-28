@@ -1,36 +1,34 @@
 # Examples
 
-## Initialize structure
+## Create the base layout
 
 ```bash
-music-init.sh
+mkdir -p "$HOME/Music/_library"
+mkdir -p "$HOME/Music/Playlists/focus"
 ```
 
-## Custom base directory
+## Add music to the canonical library
 
 ```bash
-music-init.sh "$HOME/Music"
-# or
-MUSIC_DIR="$HOME/Music" music-link "Artist/Album/Track.mp3" focus
+mkdir -p "$HOME/Music/_library/Tycho/Awake"
+cp "/path/to/01 - Awake.mp3" "$HOME/Music/_library/Tycho/Awake/"
 ```
 
-## Link by relative path (recommended)
+## Link a track into a playlist
 
 ```bash
-music-link "Tycho/Awake/01 - Awake.mp3" focus
-music-link "Nils Frahm/Spaces/01 - An Aborted Beginning.flac" sleep
+ln -s \
+  "$HOME/Music/_library/Tycho/Awake/01 - Awake.mp3" \
+  "$HOME/Music/Playlists/focus/tycho-awake.mp3"
 ```
 
-## Link by absolute path
+## Link another track into another playlist
 
 ```bash
-music-link "$HOME/Music/_library/Tycho/Awake/01 - Awake.mp3" focus
-```
-
-## Use a custom filename
-
-```bash
-music-link "Tycho/Awake/01 - Awake.mp3" focus --name "tycho-awake.mp3"
+mkdir -p "$HOME/Music/Playlists/sleep"
+ln -s \
+  "$HOME/Music/_library/Nils Frahm/Spaces/01 - An Aborted Beginning.mp3" \
+  "$HOME/Music/Playlists/sleep/nils-frahm-aborted-beginning.mp3"
 ```
 
 ## Inspect links
@@ -44,6 +42,12 @@ readlink -f "$HOME/Music/Playlists/focus/tycho-awake.mp3"
 
 ```bash
 find "$HOME/Music/Playlists" -type l ! -exec test -e {} \; -print
+```
+
+## List only playable `.mp3` files from a playlist
+
+```bash
+find -L "$HOME/Music/Playlists/focus" -type f -iname '*.mp3'
 ```
 
 ## Playback
@@ -71,3 +75,7 @@ Stop playback:
 ```bash
 pkill -x mpg123
 ```
+
+## Linux Mint tutorial
+
+For a full step-by-step guide, see [docs/linux-mint.md](/home/psyctl/apps/playlist-fs/docs/linux-mint.md).

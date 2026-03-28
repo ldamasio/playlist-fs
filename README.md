@@ -21,15 +21,49 @@ Just files + symlinks + shell.
 
 ## Install
 
-Clone and put scripts in your PATH.
+This repo currently ships one playback command: `music`.
 
-Option A (recommended): symlink scripts into `~/.local/bin`:
+On Linux Mint:
 
 ```bash
+sudo apt update
+sudo apt install -y git mpg123
+git clone https://github.com/ldamasio/playlist-fs.git
+cd playlist-fs
 mkdir -p ~/.local/bin
-ln -sf "$PWD/bin/music-init.sh" ~/.local/bin/music-init.sh
-ln -sf "$PWD/bin/music-link"    ~/.local/bin/music-link
 ln -sf "$PWD/bin/music"         ~/.local/bin/music
+```
+
+If `~/.local/bin` is not already in your `PATH`:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+For a full beginner walkthrough, see [docs/linux-mint.md](/home/psyctl/apps/playlist-fs/docs/linux-mint.md).
+
+## Quick Start
+
+Create the canonical library and one playlist:
+
+```bash
+mkdir -p "$HOME/Music/_library/Artist/Album"
+mkdir -p "$HOME/Music/Playlists/focus"
+```
+
+Put `.mp3` files into `_library`:
+
+```bash
+cp "/path/to/01 - Track.mp3" "$HOME/Music/_library/Artist/Album/"
+```
+
+Link one track into the playlist:
+
+```bash
+ln -s \
+  "$HOME/Music/_library/Artist/Album/01 - Track.mp3" \
+  "$HOME/Music/Playlists/focus/artist-album-track.mp3"
 ```
 
 ## Playback
@@ -49,3 +83,9 @@ music "$HOME/Music/Playlists/focus"
 music "$HOME/Music/_library"
 pkill -x mpg123
 ```
+
+## Docs
+
+- Linux Mint quickstart: [docs/linux-mint.md](/home/psyctl/apps/playlist-fs/docs/linux-mint.md)
+- Examples: [docs/examples.md](/home/psyctl/apps/playlist-fs/docs/examples.md)
+- Design: [docs/design.md](/home/psyctl/apps/playlist-fs/docs/design.md)
