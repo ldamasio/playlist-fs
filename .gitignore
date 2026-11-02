@@ -1,3 +1,11 @@
 .DS_Store
 *.swp
 *.tmp
+__pycache__/
+*.pyc
+# Personal catalogs, exports, and backup repositories never belong in source control.
+*.sqlite3
+*.sqlite3-*
+*.zip
+catalog-data/
+restic-repo/
