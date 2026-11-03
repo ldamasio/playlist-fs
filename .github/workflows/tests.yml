@@ -10,7 +10,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install encrypted backup test dependency
-        run: sudo apt-get update && sudo apt-get install -y restic
+      - name: Install recovery and SSH policy test dependencies
+        run: sudo apt-get update && sudo apt-get install -y restic openssh-server python3-jinja2
       - name: Playback, installation, catalog, and encrypted recovery
         run: bash tests/smoke.sh
+  sftp-deployment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install disposable-host deployment dependencies
+        run: sudo apt-get update && sudo apt-get install -y ansible-core openssh-server restic
+      - name: Ensure the disposable VM SSH service is running
+        run: sudo systemctl start ssh
+      - name: Syntax and actual SFTP deployment, isolation, and encrypted recovery
+        run: |
+          ansible-playbook --syntax-check -i ops/ansible/inventory.example.yml ops/ansible/backup-host.yml
+          sudo /usr/bin/python3 tests/sftp_deployment.py --ephemeral-host

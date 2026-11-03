@@ -1,0 +1,15 @@
+# Managed by playlist-fs. Included only at the END of sshd_config.
+# A dedicated tail include keeps this account's scope explicit and auditable.
+Match User {{ playlist_backup_user }}
+    ChrootDirectory {{ playlist_backup_jail }}
+    ForceCommand internal-sftp -d /repository -u 0077
+    AuthorizedKeysFile {{ playlist_backup_keys }}
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    DisableForwarding yes
+    PermitTTY no
+    PermitTunnel no
+    PermitUserRC no
+    X11Forwarding no

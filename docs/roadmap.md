@@ -5,7 +5,7 @@ Updated 2026-11-03. Completion means demonstrated behavior, not just an implemen
 | Stage | State | Exit criteria |
 | --- | --- | --- |
 | 1. Durable local registrations | Delivered in PR #1 | Stable IDs, provenance, corrections, idempotent captures, serialized transactions, complete exports, verified local backup/recovery, unchanged filesystem playback. |
-| 2. Operational recovery checks | Implemented on this branch; deployment pending | `doctor` detects missing, corrupt, stale, or mismatched copies; `drill` restores without the live catalog. Deployments must pass the external-copy criteria below. |
+| 2. Operational recovery checks | Delivered in PR #2; destination deployment pending | `doctor` detects missing, corrupt, stale, or mismatched copies; `drill` restores without the live catalog. Deployments must pass the external-copy criteria below. |
 | 3. Complete the collection | Partial; historical pasted playlists still need locating | Import the original message content with provenance, preserve order/duplicates, resolve ambiguous pairs and damaged spelling from evidence, demonstrate coverage without declaring unseen history recovered. |
 | 4. Filesystem integration | Planned | Associate stable track IDs with existing audio files; produce symlink playlists only for resolved files, preserve ordering, report missing audio, and rebuild without changing the catalog authority. |
 | 5. Optional desktop | Proposed after operational acceptance | Search, register, correct, and show protection state through the same domain commands. Pass Linux Mint resource and recovery gates in [ADR 0002](adr/0002-optional-desktop.md). |
@@ -21,7 +21,7 @@ The code supports Restic; this does not establish a deployed remote backup. Befo
 4. Restore each destination on another machine and compare catalog identity, audit head, IDs, and source evidence. Keep private drill reports and record credential recovery without the original device.
 5. Enable bounded scheduled retries, define a maximum acceptable copy age, demonstrate visible failure, and choose retention/capacity monitoring before pruning anything.
 
-No accounts, remote repositories, production infrastructure, or systemd timers are created by this branch. Health/drill commands run only when invoked and leave no resident process. Storage destinations and production activation are deployment decisions; no provider independence or recovery-time objective is inferred from local tests.
+Health/drill commands run only when invoked and leave no resident process. The [opt-in SFTP deployment procedure](deploy-sftp.md) prepares a dedicated account and scoped SSH policy when explicitly applied. Installing the CLI or merging source code does not deploy a destination or activate a timer. Storage destinations and production activation are deployment decisions; no provider independence or recovery-time objective is inferred from local tests.
 
 ## Next desktop experiment
 
