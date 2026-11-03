@@ -46,13 +46,14 @@ For the full beginner flow on Linux Mint, see [docs/linux-mint.md](docs/linux-mi
 music catalog add --artist "Example performer" --title "Example title" --request-id capture-001
 music catalog search "Example"
 music catalog status
+music catalog doctor
 music catalog pending
 music catalog backup
 ```
 
 Use a unique request ID for each capture and reuse it when retrying that capture. Corrections use `music catalog edit <track-id>` and keep the same permanent track ID. `--composer` is repeatable and remains distinct from `--artist` (performer). Unknown composers stay unknown.
 
-Paste playlists into `music catalog import-paste`, then end standard input with Ctrl+D. Every original line is kept; ambiguous lines appear under `pending`. See [catalog commands](docs/catalog.md), [backup and disaster recovery](docs/recovery.md), and the [architecture decision](docs/adr/0001-metadata-durability.md).
+Paste playlists into `music catalog import-paste`, then end standard input with Ctrl+D. Every original line is kept; ambiguous lines appear under `pending`. See [catalog commands](docs/catalog.md), [backup and disaster recovery](docs/recovery.md), the [roadmap](docs/roadmap.md), and the [architecture decision](docs/adr/0001-metadata-durability.md).
 
 `MUSIC_CATALOG_DIR` selects an explicit local catalog; the default is `${XDG_DATA_HOME:-~/.local/share}/playlist-fs/catalog`. Personal data stays outside this public source repository. `music catalog` works without `mpg123` installed.
 
@@ -113,6 +114,8 @@ pkill -x mpg123
 - Design: [docs/design.md](docs/design.md)
 - Metadata catalog: [docs/catalog.md](docs/catalog.md)
 - Recovery: [docs/recovery.md](docs/recovery.md)
+- Roadmap and acceptance criteria: [docs/roadmap.md](docs/roadmap.md)
+- Optional lightweight desktop proposal: [docs/adr/0002-optional-desktop.md](docs/adr/0002-optional-desktop.md)
 
 ## Tests
 

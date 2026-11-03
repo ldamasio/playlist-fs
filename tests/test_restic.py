@@ -54,6 +54,18 @@ class ResticTests(unittest.TestCase):
             self.assertEqual(catalog.validate(con)['event_hash'],manifest['event_hash'])
             self.assertIn('Original source',con.execute('SELECT payload FROM events').fetchone()[0])
         self.assertEqual(info['tracks'],1)
+        protection=catalog.doctor(self.con,repository=str(self.repo),check_replica=True)
+        self.assertTrue(protection['ok'])
+        self.assertEqual(protection['replica']['state'],'verified')
+        # A drill must not depend on the original database, its receipt table, or
+        # MUSIC_CATALOG_DIR. The same encrypted snapshot is sufficient.
+        self.con.close()
+        (self.root/'catalog.sqlite3').unlink()
+        report=self.base/'drill-report.json'
+        drill=catalog.recovery_drill(repository=str(self.repo),snapshot_id=replica['snapshot_id'],report=report)
+        self.assertEqual(drill['event_hash'],manifest['event_hash'])
+        self.assertTrue(drill['restored_data_equal'])
+        self.assertFalse((self.root/'catalog.sqlite3').exists())
         subprocess.run([RESTIC,'--repo',str(self.repo),'check','--read-data'],check=True,capture_output=True)
 
     def test_wrong_key_leaves_a_saved_record_and_pending_copy(self):

@@ -18,6 +18,7 @@ music catalog edit <track-id> --clear-composers
 music catalog edit <track-id> --reviewed
 music catalog history --track-id <track-id>
 music catalog status
+music catalog doctor
 ```
 
 Performer and composer are different fields; the application never infers authorship from the performer. `--version` distinguishes versions such as live recordings and remixes. Exact normalized identities deduplicate registrations; fuzzy matching never silently merges them. Correcting an identity to one already registered fails atomically and requires human reconciliation. Supplying different composers on a repeated `add` requires an explicit `edit`.
@@ -62,6 +63,8 @@ A new export directory contains `tracks.jsonl`, complete `catalog.jsonl` (all ta
 
 - `0`: requested operation completed. A successful registration can still have `protection: local_snapshot_only` when no replica is configured.
 - `1`: validation, input, or explicitly requested operation failed. Inspect the JSON error.
-- `3`: a registration/correction/import committed locally, but its backup or configured replica is pending. Inspect `local_saved` and retry with the same request ID.
+- `3`: a registration/correction/import committed locally, but its backup or configured replica is pending. Inspect `local_saved` and retry with the same request ID. For `doctor`, the requested protection checks are not satisfied; this read-only command does not register or retry a capture.
 
 `status` lists the last verified snapshot copies and whether each covers the current audit head. A later registration makes old receipts stale. A receipt is historical evidence of successful verification, not continuous remote monitoring. Physical/provider/account independence is always reported as unverified by this application.
+
+`doctor` opens the catalog read-only and checks that at least one actual local archive matches its receipt, passes full backup validation, covers the current records, and is within the age policy (24 hours by default). It makes no network calls by default, even with a configured repository. Its `ok` applies only to the explicit `requirements` in the result; local success does not certify an external copy. See [operational checks and recovery drills](recovery.md#operational-checks-and-recovery-drills).

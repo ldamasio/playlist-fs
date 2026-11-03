@@ -460,14 +460,112 @@ def replicate(con, path, repository, label, password_file=None):
     receipt(con,manifest,sha(contents),'restic',sha(repository.encode()),label,snapshot_id)
     return dict(label=label,snapshot_id=snapshot_id,archive_sha256=sha(contents),readback_verified=True)
 
-def restore_restic(repository,snapshot_id,destination,password_file=None):
+def read_restic_archive(repository,snapshot_id,password_file=None):
     if not re.fullmatch(r'[0-9a-f]{8,64}',snapshot_id):
         raise ValueError('use an explicit restic snapshot ID, not latest')
-    contents = run_restic(restic_command(repository,password_file)+['dump',snapshot_id,'/playlist-fs/catalog.zip'])
+    return run_restic(restic_command(repository,password_file)+['dump',snapshot_id,'/playlist-fs/catalog.zip'])
+
+def restore_restic(repository,snapshot_id,destination,password_file=None):
+    contents = read_restic_archive(repository,snapshot_id,password_file)
     with tempfile.TemporaryDirectory(prefix='playlist-fs-recovery-') as tmp:
         path = Path(tmp)/'snapshot.zip'
         path.write_bytes(contents)
         return restore(path,destination)
+
+def recovery_drill(archive=None,repository=None,snapshot_id=None,password_file=None,report=None):
+    """Prove recovery without consulting or changing the authoritative catalog."""
+    if bool(archive)==bool(snapshot_id):
+        raise ValueError('provide either a local archive or an explicit restic snapshot')
+    if archive and (repository or password_file):
+        raise ValueError('repository/password options apply only to a restic snapshot')
+    contents = Path(archive).read_bytes() if archive else read_restic_archive(repository,snapshot_id,password_file)
+    with tempfile.TemporaryDirectory(prefix='playlist-fs-drill-') as tmp:
+        path = Path(tmp)/'snapshot.zip'
+        publish_bytes(path,contents)
+        manifest = restore(path,Path(tmp)/'restored')
+        with contextlib.closing(readonly(Path(tmp)/'restored/catalog.sqlite3')) as recovered:
+            info = validate(recovered)
+            if sha(jsonl(recovered))!=manifest['files']['catalog.jsonl']:
+                raise ValueError('restored data does not match the complete snapshot export')
+    result = dict(format=VERSION,operation='recovery_drill',verified_at=now(),**info,
+                  source='local_archive' if archive else 'restic',archive_sha256=sha(contents),
+                  restored_data_equal=True,original_catalog_required=False,
+                  temporary_restore_removed=True,offsite_independence='not_verified')
+    if snapshot_id: result['snapshot_id'] = snapshot_id
+    if report: publish_bytes(report,(encoded(result)+'\n').encode())
+    return result
+
+def receipt_age_hours(item):
+    when = datetime.fromisoformat(item['verified_at'])
+    if when.tzinfo is None:
+        raise ValueError('receipt timestamp must include a timezone')
+    age = (datetime.now(timezone.utc)-when).total_seconds()/3600
+    if age < -5/60:
+        raise ValueError('receipt timestamp is in the future')
+    return max(0,age)
+
+def check_snapshot_receipt(path,item,current):
+    if sha(Path(path).read_bytes())!=item['archive_sha256']:
+        raise ValueError('archive does not match its verified receipt')
+    manifest = verify_backup(path)
+    if any(manifest[k]!=current[k] for k in ('catalog_id','event_seq','event_hash','tracks')):
+        raise ValueError('archive does not cover the current catalog records')
+    return manifest
+
+def doctor(con,max_age_hours=24,repository=None,password_file=None,check_replica=False,require_replica=False):
+    """Check actual recovery files. Remote access is an explicit opt-in."""
+    if not 0 < max_age_hours < float('inf'):
+        raise ValueError('max-age-hours must be a positive finite number')
+    state = status(con)
+    current = {k:state[k] for k in ('catalog_id','event_seq','event_hash','tracks')}
+    failures = (ValueError,OSError,sqlite3.Error,zipfile.BadZipFile,KeyError,TypeError)
+    local = dict(state='missing',checked=True,attempts=[])
+    for item in state['receipts']:
+        if item['kind']!='local': continue
+        attempt = dict(receipt_id=item['id'],state='stale')
+        local['attempts'].append(attempt)
+        try:
+            age = receipt_age_hours(item)
+            attempt['age_hours'] = round(age,3)
+            if not item['covers_current_records'] or age>max_age_hours: continue
+            check_snapshot_receipt(item['location'],item,current)
+            attempt['state'] = 'verified'
+            local.update(state='verified',receipt_id=item['id'],age_hours=round(age,3))
+            break
+        except failures:
+            attempt['state'] = 'unavailable_or_invalid'
+    if local['state']!='verified' and local['attempts']:
+        local['state'] = 'no_fresh_verified_snapshot'
+    replica = dict(state='not_configured',checked=False)
+    if repository:
+        replica['state'] = 'not_checked'
+        if check_replica:
+            replica.update(state='missing',checked=True)
+            candidates = [r for r in state['receipts'] if r['kind']=='restic' and r['target_id']==sha(repository.encode())]
+            if candidates:
+                item = candidates[0]
+                replica.update(state='stale',receipt_id=item['id'])
+                try:
+                    age = receipt_age_hours(item)
+                    replica['age_hours'] = round(age,3)
+                    if item['covers_current_records'] and age<=max_age_hours:
+                        contents = read_restic_archive(repository,item['location'],password_file)
+                        with tempfile.TemporaryDirectory(prefix='playlist-fs-doctor-') as tmp:
+                            path = Path(tmp)/'snapshot.zip'
+                            publish_bytes(path,contents)
+                            check_snapshot_receipt(path,item,current)
+                        replica['state'] = 'verified'
+                except failures:
+                    replica['state'] = 'unavailable_or_invalid'
+    required = require_replica or check_replica
+    ok = local['state']=='verified' and (not required or replica['state']=='verified')
+    # A writer may commit during file/network checks. Recheck so an old proof is not
+    # presented as covering a newer capture; no SQLite transaction spans network I/O.
+    after = validate(con)
+    changed = any(after[k]!=current[k] for k in current)
+    return dict(**current,ok=ok and not changed,checked_at=now(),max_age_hours=max_age_hours,
+                requirements=dict(local_snapshot=True,replica=required),catalog_changed_during_check=changed,
+                local=local,replica=replica,offsite_independence='not_verified')
 
 def status(con):
     with read_transaction(con):
@@ -543,6 +641,13 @@ def parser():
     b = s.add_parser('backup'); b.add_argument('--to',type=Path)
     v = s.add_parser('verify'); v.add_argument('archive',type=Path)
     r = s.add_parser('restore'); r.add_argument('archive',type=Path); r.add_argument('--to',type=Path,required=True)
+    d = s.add_parser('doctor',help='check recovery files; remote reads require --check-replica')
+    d.add_argument('--max-age-hours',type=float,default=24)
+    d.add_argument('--check-replica',action='store_true'); d.add_argument('--require-replica',action='store_true')
+    d.add_argument('--repository'); d.add_argument('--password-file')
+    d = s.add_parser('drill',help='restore in a temporary directory without the live catalog')
+    d.add_argument('archive',type=Path,nargs='?'); d.add_argument('--repository'); d.add_argument('--password-file')
+    d.add_argument('--snapshot'); d.add_argument('--report',type=Path)
     for name in ('replicate','restore-restic'):
         r = s.add_parser(name); r.add_argument('--repository'); r.add_argument('--password-file')
         if name=='replicate':
@@ -558,6 +663,14 @@ def main(argv=None):
     code = 0
     if args.command=='verify': result = verify_backup(args.archive)
     elif args.command=='restore': result = restore(args.archive,args.to)
+    elif args.command=='drill':
+        repository = args.repository or (os.environ.get('MUSIC_CATALOG_RESTIC_REPOSITORY') if args.snapshot else None)
+        result = recovery_drill(args.archive,repository,args.snapshot,args.password_file,args.report)
+    elif args.command=='doctor':
+        with contextlib.closing(readonly(root/'catalog.sqlite3')) as con:
+            result = doctor(con,args.max_age_hours,args.repository or os.environ.get('MUSIC_CATALOG_RESTIC_REPOSITORY'),
+                            args.password_file,args.check_replica,args.require_replica)
+            code = 0 if result['ok'] else 3
     elif args.command=='restore-restic':
         result = restore_restic(args.repository or os.environ.get('MUSIC_CATALOG_RESTIC_REPOSITORY'),args.snapshot,args.to,args.password_file)
     else:
