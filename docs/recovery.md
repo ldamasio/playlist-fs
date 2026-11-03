@@ -77,4 +77,27 @@ Local snapshots and Restic snapshots are retained until explicitly managed. Auto
 
 For a reliable deployment, demonstrate: registration without internet; current verified copy on another machine; another encrypted copy with independent provider/account or offline custody; restore on a clean machine; failed-copy visibility; and recovery of credentials without the primary infrastructure. Re-run restore drills periodically and after upgrades. A second copy on Jaguar alone cannot prove provider/account independence. No RPO/RTO or off-site availability is promised by source code or a local test.
 
+## Operational checks and recovery drills
+
+Run these checks on demand or from an explicitly configured scheduler:
+
+```bash
+music catalog doctor
+music catalog doctor --max-age-hours 48
+music catalog doctor --check-replica --require-replica --repository <repository>
+music catalog drill /path/snapshot.zip --report /path/private/drill-unique.json
+music catalog drill --repository <repository> --snapshot <explicit-snapshot-id> \
+  --report /path/private/remote-drill-unique.json
+```
+
+`doctor` reads the database without modifying it and validates the actual local archive bytes, their receipt hash, catalog identity, audit head, and full SQLite/JSONL/SQL agreement. It accepts another valid current local copy if a newer receipt points to a missing or corrupt file. Its default policy requires a snapshot verified within 24 hours, even when the records have not changed; refresh with `backup` or change the policy deliberately. Timestamps over five minutes in the future are invalid. Age limits must be positive and finite.
+
+Remote I/O requires `--check-replica`; merely configuring a repository never causes a network read in `doctor`. That flag requires a matching receipt for the selected repository and reads its exact Restic snapshot back, verifying the receipt hash and the full archive again. The password options/environment are the same as `replicate`. Without the flag, remote health is `not_checked`. `--require-replica` alone reports pending protection until the remote check is explicitly requested. A remote check does not create a snapshot, repair a failure, or write a new receipt. Refresh a stale copy with `replicate`.
+
+An `ok: true` result means only that the listed requirements passed at check time. The command rechecks the live catalog head after file/network reads; if a concurrent registration changed it, the result is pending and can be retried. Exit `0` means the requested protection checks passed, `3` means incomplete protection, and `1` means input/catalog validation failed. Remote account/provider/physical independence remains unverified. Credentials, repository URLs, and Restic child diagnostics are not included in the doctor result.
+
+`drill` restores a supplied local archive or explicit Restic snapshot into a fresh temporary directory, validates the recovered database, and compares every exported table with the snapshot. It needs no live catalog, receipt table, k3s, or database server, and leaves the authoritative catalog untouched. The temporary copy is removed before success is reported. Optional report files are private, published atomically, and never overwrite existing evidence. No success report is written after a failed restoration. Reports describe the chosen snapshot; they do not certify that it is the latest capture or an independent off-site copy. A temporary-directory drill on the original computer is preparation for a separate clean-machine drill, not proof of recovery after device loss.
+
+After configuring a real destination, retain a private report for each destination and demonstrate a second-machine restoration with credentials retrieved independently. Configure scheduled checks and failure notification only after the destination and credential custody are established. The existing systemd templates are opt-in and remain inactive until installed and enabled.
+
 References: [Restic repository preparation](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html), [Restic scripting](https://restic.readthedocs.io/en/stable/075_scripting.html), [SQLite network-file caveats](https://www.sqlite.org/useovernet.html).
