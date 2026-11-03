@@ -40,6 +40,8 @@ music catalog replicate \
 
 These hostnames and paths are placeholders, not infrastructure setup commands for a real server. Use a dedicated backup account and directory; never reuse a shared production database directory. Preserve SSH host verification. SFTP requires an SSH/SFTP server; Restic itself runs on the client.
 
+For an existing SSH host, the [dedicated SFTP deployment procedure](deploy-sftp.md) supplies an opt-in account/chroot playbook, validation/rollback, and client/scheduler acceptance steps. It is separate from normal installation and requires review of the target host.
+
 The app verifies a local archive, uploads it through Restic, then reads the exact snapshot back and checks its SHA-256 before recording a receipt. Repository/storage errors, wrong keys, and timeouts leave the local capture saved and report a pending replica. No successful receipt is fabricated. A lost acknowledgement can create another Restic snapshot on retry; content is deduplicated by Restic and track captures remain idempotent.
 
 ## Automatic copies after each mutation

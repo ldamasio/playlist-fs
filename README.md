@@ -114,6 +114,7 @@ pkill -x mpg123
 - Design: [docs/design.md](docs/design.md)
 - Metadata catalog: [docs/catalog.md](docs/catalog.md)
 - Recovery: [docs/recovery.md](docs/recovery.md)
+- Optional dedicated SFTP destination: [docs/deploy-sftp.md](docs/deploy-sftp.md)
 - Roadmap and acceptance criteria: [docs/roadmap.md](docs/roadmap.md)
 - Optional lightweight desktop proposal: [docs/adr/0002-optional-desktop.md](docs/adr/0002-optional-desktop.md)
 

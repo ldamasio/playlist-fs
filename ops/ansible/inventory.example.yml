@@ -1,0 +1,8 @@
+all:
+  children:
+    playlist_backup:
+      hosts:
+        backup-host:
+          ansible_host: 192.0.2.10  # Documentation address; supply a private inventory.
+          ansible_user: root
+          ansible_ssh_common_args: -o BatchMode=yes -o StrictHostKeyChecking=yes

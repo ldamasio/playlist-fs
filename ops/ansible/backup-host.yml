@@ -1,0 +1,227 @@
+---
+# Standalone opt-in playbook. Never included in a general host/site playbook.
+- name: Provision a dedicated encrypted-catalog SFTP destination
+  hosts: playlist_backup
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    playlist_backup_user: playlist-backup
+    playlist_backup_jail: /srv/playlist-fs-backup
+    playlist_backup_fragment: /etc/ssh/playlist-fs-backup.conf
+    playlist_backup_keys: /etc/ssh/playlist-fs-backup.keys
+    playlist_backup_include: Include /etc/ssh/playlist-fs-backup.conf
+    playlist_backup_public_key: "{{ lookup('ansible.builtin.file', playlist_backup_public_key_file) | trim }}"
+  tasks:
+    - name: Require an explicit dedicated public key and fixed deployment scope
+      ansible.builtin.assert:
+        that:
+          - playlist_backup_public_key_file is defined
+          - playlist_backup_user == 'playlist-backup'
+          - playlist_backup_jail == '/srv/playlist-fs-backup'
+          - playlist_backup_fragment == '/etc/ssh/playlist-fs-backup.conf'
+          - playlist_backup_keys == '/etc/ssh/playlist-fs-backup.keys'
+          - playlist_backup_include == 'Include /etc/ssh/playlist-fs-backup.conf'
+          - playlist_backup_public_key is match('^ssh-ed25519 [A-Za-z0-9+/]+={0,3}( [^\r\n]*)?$')
+        fail_msg: Supply a dedicated single-line Ed25519 public key; this playbook manages only its fixed account and paths.
+
+    - name: Inspect existing deployment paths without following symlinks
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
+      loop:
+        - "{{ playlist_backup_jail }}"
+        - "{{ playlist_backup_jail }}/.playlist-fs-managed"
+        - "{{ playlist_backup_fragment }}"
+        - "{{ playlist_backup_keys }}"
+        - /srv
+        - /etc/ssh/sshd_config
+        - "{{ playlist_backup_jail }}/repository"
+      register: backup_paths
+
+    - name: Inspect an existing account
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ playlist_backup_user }}"
+        fail_key: false
+
+    - name: Refuse unrelated accounts, preexisting paths, or unsafe chroot ancestors
+      ansible.builtin.assert:
+        that:
+          - backup_paths.results | selectattr('stat.islnk', 'defined') | selectattr('stat.islnk') | list | length == 0
+          - backup_paths.results[4].stat.uid == 0
+          - backup_paths.results[4].stat.mode == '0755'
+          - backup_paths.results[5].stat.isreg
+          - backup_paths.results[5].stat.uid == 0
+          - >-
+            (backup_paths.results[1].stat.exists and
+             backup_paths.results[1].stat.uid == 0 and
+             backup_paths.results[1].stat.isreg) or
+            (not backup_paths.results[0].stat.exists and
+             not backup_paths.results[2].stat.exists and
+             not backup_paths.results[3].stat.exists and
+             not ansible_facts.getent_passwd[playlist_backup_user])
+        fail_msg: Existing account/paths are not owned by this deployment, or the host paths are unsafe. Inspect before adopting anything.
+
+    - name: Read the main SSH configuration for rollback
+      ansible.builtin.slurp:
+        src: /etc/ssh/sshd_config
+      register: backup_ssh_before
+
+    - name: Keep the scoped Match include at the end of the main configuration
+      ansible.builtin.assert:
+        that:
+          - >-
+            playlist_backup_include not in (backup_ssh_before.content | b64decode) or
+            (backup_ssh_before.content | b64decode | trim).endswith(playlist_backup_include)
+        fail_msg: The scoped backup include must be the final directive; review later SSH configuration before proceeding.
+
+    - name: Read a previous managed fragment
+      ansible.builtin.slurp:
+        src: "{{ playlist_backup_fragment }}"
+      register: backup_fragment_before
+      when: backup_paths.results[2].stat.exists
+
+    - name: Record the effective administrator policy
+      ansible.builtin.command:
+        argv: [/usr/sbin/sshd, -T, -C, 'user=root,host=localhost,addr=127.0.0.1']
+      changed_when: false
+      check_mode: false
+      register: backup_admin_before
+
+    - name: Create the dedicated system group
+      ansible.builtin.group:
+        name: "{{ playlist_backup_user }}"
+        system: true
+
+    - name: Create a locked account with no login shell or sudo access
+      ansible.builtin.user:
+        name: "{{ playlist_backup_user }}"
+        group: "{{ playlist_backup_user }}"
+        groups: []
+        append: false
+        system: true
+        home: /repository
+        create_home: false
+        shell: /usr/sbin/nologin
+        password_lock: true
+
+    - name: Create the root-owned chroot boundary
+      ansible.builtin.file:
+        path: "{{ playlist_backup_jail }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Mark the dedicated deployment
+      ansible.builtin.copy:
+        dest: "{{ playlist_backup_jail }}/.playlist-fs-managed"
+        content: "playlist-fs SFTP backup destination v1\n"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Create the only user-writable repository directory
+      ansible.builtin.file:
+        path: "{{ playlist_backup_jail }}/repository"
+        state: directory
+        owner: "{{ playlist_backup_user }}"
+        group: "{{ playlist_backup_user }}"
+        mode: "0700"
+
+    - name: Install the dedicated restricted public key
+      ansible.builtin.copy:
+        dest: "{{ playlist_backup_keys }}"
+        content: "restrict {{ playlist_backup_public_key }}\n"
+        owner: root
+        group: root
+        # sshd reads this public material with the authenticating user's access.
+        mode: "0644"
+
+    - name: Install and validate the scoped SSH policy before reloading
+      block:
+        - name: Install the scoped SFTP fragment outside the global drop-in glob
+          ansible.builtin.template:
+            src: templates/backup-sftp.conf.j2
+            dest: "{{ playlist_backup_fragment }}"
+            owner: root
+            group: root
+            mode: "0644"
+          register: backup_fragment
+
+        - name: Append the scoped include after all global SSH settings
+          ansible.builtin.lineinfile:
+            path: /etc/ssh/sshd_config
+            line: "{{ playlist_backup_include }}"
+            insertafter: EOF
+          register: backup_include
+
+        - name: Validate the assembled SSH configuration
+          ansible.builtin.command: /usr/sbin/sshd -t
+          changed_when: false
+          when: not ansible_check_mode
+
+        - name: Read effective administrator and backup policies
+          ansible.builtin.command:
+            argv: [/usr/sbin/sshd, -T, -C, 'user={{ item }},host=localhost,addr=127.0.0.1']
+          loop: [root, "{{ playlist_backup_user }}"]
+          changed_when: false
+          when: not ansible_check_mode
+          register: backup_effective
+
+        - name: Verify isolation and unchanged administrator access
+          ansible.builtin.assert:
+            that:
+              - backup_effective.results[0].stdout == backup_admin_before.stdout
+              - "'chrootdirectory ' + playlist_backup_jail in backup_effective.results[1].stdout_lines"
+              - "'forcecommand internal-sftp -d /repository -u 0077' in backup_effective.results[1].stdout_lines"
+              - "'authorizedkeysfile ' + playlist_backup_keys in backup_effective.results[1].stdout_lines"
+              - "'disableforwarding yes' in backup_effective.results[1].stdout_lines"
+              - "'authenticationmethods publickey' in backup_effective.results[1].stdout_lines"
+              - "'passwordauthentication no' in backup_effective.results[1].stdout_lines"
+              - "'permittty no' in backup_effective.results[1].stdout_lines"
+          when: not ansible_check_mode
+
+        - name: Reload SSH only after complete validation
+          ansible.builtin.service:
+            name: ssh
+            state: reloaded
+          when: backup_fragment.changed or backup_include.changed
+
+      rescue:
+        - name: Restore the previous main configuration
+          ansible.builtin.copy:
+            dest: /etc/ssh/sshd_config
+            content: "{{ backup_ssh_before.content | b64decode }}"
+            owner: root
+            group: root
+            mode: "{{ backup_paths.results[5].stat.mode }}"
+
+        - name: Restore a previous managed fragment
+          ansible.builtin.copy:
+            dest: "{{ playlist_backup_fragment }}"
+            content: "{{ backup_fragment_before.content | b64decode }}"
+            owner: root
+            group: root
+            mode: "0644"
+          when: backup_paths.results[2].stat.exists
+
+        - name: Remove a newly introduced fragment
+          ansible.builtin.file:
+            path: "{{ playlist_backup_fragment }}"
+            state: absent
+          when: not backup_paths.results[2].stat.exists
+
+        - name: Validate the restored SSH configuration
+          ansible.builtin.command: /usr/sbin/sshd -t
+          changed_when: false
+
+        - name: Reload the restored SSH policy
+          ansible.builtin.service:
+            name: ssh
+            state: reloaded
+
+        - name: Report rollback without removing any repository data
+          ansible.builtin.fail:
+            msg: SSH policy was rolled back. The dedicated account/directory may remain; no repository data was removed.
