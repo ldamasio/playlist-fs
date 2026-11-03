@@ -1,0 +1,10 @@
+[Unit]
+Description=Verify an encrypted playlist-fs metadata replica
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/playlist-fs/backup.env
+ExecStart=%h/.local/bin/music catalog replicate
+UMask=0077
+NoNewPrivileges=true
+TimeoutStartSec=5min

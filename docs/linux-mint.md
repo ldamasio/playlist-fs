@@ -8,10 +8,10 @@ Open Terminal and run:
 
 ```bash
 sudo apt update
-sudo apt install -y git mpg123
+sudo apt install -y git mpg123 python3
 ```
 
-`mpg123` is the playback engine. `playlist-fs` does not run a daemon or database.
+`mpg123` is the playback engine. Optional `music catalog` commands use Python 3 and a local SQLite metadata database; playback needs neither a database nor a daemon. Install `restic` when configuring encrypted backup replicas. See [catalog](catalog.md) and [recovery](recovery.md).
 
 ## 2. Clone the repo and install the command
 

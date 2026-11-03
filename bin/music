@@ -6,6 +6,13 @@ die() {
   exit 1
 }
 
+if [ "${1:-}" = catalog ]; then
+  shift
+  command -v python3 >/dev/null 2>&1 || die "catalog requires python3"
+  executable="$(readlink -f -- "${BASH_SOURCE[0]}")"
+  exec python3 "$(dirname -- "$executable")/../libexec/catalog.py" "$@"
+fi
+
 MUSIC_DIR="${MUSIC_DIR:-$HOME/Music}"
 DEFAULT_PATH="${MUSIC_PLAY_DEFAULT:-$MUSIC_DIR/Playlists/focus}"
 

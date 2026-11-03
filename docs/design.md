@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make playlists a filesystem concern, not a database concern.
+Keep audio files and playable playlist membership inspectable in the filesystem. Preserve metadata curation separately, including references with no downloaded audio.
 
 - Canonical library: `~/Music/_library`
 - Playlists: `~/Music/Playlists/<name>/` as symlink directories
@@ -59,7 +59,13 @@ Playback stays stateless:
 - `mpg123` is started as a normal background process
 - stopping playback is just killing the `mpg123` process
 
-This avoids duplicating `_library` and `Playlists` in a second index or daemon.
+Playback does not query the metadata catalog. The catalog is an optional durable curation record, not an authoritative index of audio files or symlinks. A registered track does not imply an audio file exists. Automatic filesystem projection or server synchronization is a later integration.
+
+## Metadata durability
+
+`music catalog` assigns permanent IDs and records corrections and original sources in one SQLite transaction. A request ID makes a repeated capture idempotent. An append-only audit table stores hashes and previous values; the application verifies both the chain and its agreement with current track state. This detects accidental untracked changes, not an attacker who can rewrite the database and its entire history.
+
+Metadata backups contain a consistent SQLite snapshot, JSONL, and portable SQL. Both SQLite and SQL recovery are checked before publishing a backup. Restic replicas are acknowledged only after a byte-for-byte readback of that verified archive. Failed replication leaves committed local data intact and returns exit status 3. See [the decision](adr/0001-metadata-durability.md).
 
 ---
 
